@@ -143,6 +143,19 @@ For a hosted deployment, configure authentication in Streamlit using an OIDC pro
 2. The app reads the authenticated identity from `st.user`.
 3. JobMate stores each user's tracker data separately.
 
+Example Streamlit secrets configuration:
+
+```toml
+[auth]
+redirect_uri = "https://your-app.streamlit.app/oauth2callback"
+cookie_secret = "your-cookie-secret"
+client_id = "your-provider-client-id"
+client_secret = "your-provider-client-secret"
+server_metadata_url = "https://accounts.google.com/.well-known/openid-configuration"
+```
+
+Without those values configured in Streamlit Cloud secrets, the hosted sign-in button will not work.
+
 Official Streamlit auth docs:
 
 https://docs.streamlit.io/develop/tutorials/authentication

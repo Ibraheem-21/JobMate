@@ -32,6 +32,16 @@ def get_runtime_mode() -> str:
     return "hosted" if Path("/mount/src").exists() else "local"
 
 
+def auth_is_configured() -> bool:
+    try:
+        auth_config = st.secrets.get("auth", {})
+    except Exception:
+        return False
+
+    required_keys = ["redirect_uri", "cookie_secret", "client_id", "client_secret", "server_metadata_url"]
+    return all(auth_config.get(key) for key in required_keys)
+
+
 def get_user_identity() -> tuple[str | None, str, bool]:
     runtime_mode = get_runtime_mode()
     user_obj = getattr(st, "user", None)
@@ -52,6 +62,7 @@ def get_user_identity() -> tuple[str | None, str, bool]:
 def render_auth_gate() -> tuple[str | None, bool]:
     user_key, user_label, is_authenticated = get_user_identity()
     runtime_mode = get_runtime_mode()
+    configured = auth_is_configured()
 
     if is_authenticated:
         st.caption(f"Signed in as {user_label}")
@@ -60,6 +71,20 @@ def render_auth_gate() -> tuple[str | None, bool]:
         return user_key, True
 
     if runtime_mode == "hosted":
+        if not configured:
+            st.error("Hosted authentication is not configured for this deployment yet.")
+            st.code(
+                "[auth]\n"
+                'redirect_uri = "https://your-app.streamlit.app/oauth2callback"\n'
+                'cookie_secret = "your-cookie-secret"\n'
+                'client_id = "your-provider-client-id"\n'
+                'client_secret = "your-provider-client-secret"\n'
+                'server_metadata_url = "https://accounts.google.com/.well-known/openid-configuration"\n',
+                language="toml",
+            )
+            st.caption("Configure these values in your Streamlit app secrets, then redeploy or restart the app.")
+            st.stop()
+
         st.warning("Sign in to access your private JobMate workspace on the hosted app.")
         if hasattr(st, "login"):
             st.button("Sign in", on_click=st.login, type="primary")
