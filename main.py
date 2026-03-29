@@ -1,6 +1,5 @@
 from collections import Counter
 from datetime import date, datetime, timedelta
-from pathlib import Path
 from typing import Any
 
 import streamlit as st
@@ -26,72 +25,6 @@ FORM_DEFAULTS = {
     "jobmate_weekly_goal": 5,
 }
 RESET_FLAG = "jobmate_reset_form"
-
-
-def get_runtime_mode() -> str:
-    return "hosted" if Path("/mount/src").exists() else "local"
-
-
-def auth_is_configured() -> bool:
-    try:
-        auth_config = st.secrets.get("auth", {})
-    except Exception:
-        return False
-
-    required_keys = ["redirect_uri", "cookie_secret", "client_id", "client_secret", "server_metadata_url"]
-    return all(auth_config.get(key) for key in required_keys)
-
-
-def get_user_identity() -> tuple[str | None, str, bool]:
-    runtime_mode = get_runtime_mode()
-    user_obj = getattr(st, "user", None)
-    is_logged_in = bool(getattr(user_obj, "is_logged_in", False))
-
-    if is_logged_in:
-        email = getattr(user_obj, "email", None)
-        user_id = getattr(user_obj, "sub", None)
-        name = getattr(user_obj, "name", None) or email or "Authenticated user"
-        return email or user_id, name, True
-
-    if runtime_mode == "local":
-        return None, "Local development mode", False
-
-    return None, "Guest", False
-
-
-def render_auth_gate() -> tuple[str | None, bool]:
-    user_key, user_label, is_authenticated = get_user_identity()
-    runtime_mode = get_runtime_mode()
-    configured = auth_is_configured()
-
-    if is_authenticated:
-        st.caption(f"Signed in as {user_label}")
-        if hasattr(st, "logout"):
-            st.button("Log out", on_click=st.logout)
-        return user_key, True
-
-    if runtime_mode == "hosted":
-        if not configured:
-            st.error("Hosted authentication is not configured for this deployment yet.")
-            st.code(
-                "[auth]\n"
-                'redirect_uri = "https://your-app.streamlit.app/oauth2callback"\n'
-                'cookie_secret = "your-cookie-secret"\n'
-                'client_id = "your-provider-client-id"\n'
-                'client_secret = "your-provider-client-secret"\n'
-                'server_metadata_url = "https://accounts.google.com/.well-known/openid-configuration"\n',
-                language="toml",
-            )
-            st.caption("Configure these values in your Streamlit app secrets, then redeploy or restart the app.")
-            st.stop()
-
-        st.warning("Sign in to access your private JobMate workspace on the hosted app.")
-        if hasattr(st, "login"):
-            st.button("Sign in", on_click=st.login, type="primary")
-        st.stop()
-
-    st.caption("Running in local mode without authentication.")
-    return user_key, False
 
 
 def ensure_form_state() -> None:
@@ -195,7 +128,7 @@ def render_metrics(applications: list[dict[str, Any]], reminders: list[dict[str,
         )
 
 
-def render_add_application(data: dict[str, list[dict[str, Any]]], user_key: str | None) -> None:
+def render_add_application(data: dict[str, list[dict[str, Any]]]) -> None:
     st.subheader("Log a job application")
     ensure_form_state()
     st.caption("Manual entry only. Keep the saved description field if you want the posting stored with the application.")
@@ -244,7 +177,7 @@ def render_add_application(data: dict[str, list[dict[str, Any]]], user_key: str 
             if not application["role"] or not application["company"]:
                 st.error("Role and company are required.")
             else:
-                add_application(data, application, user_key)
+                add_application(data, application)
                 queue_form_reset()
                 st.rerun()
 
@@ -276,9 +209,7 @@ def render_focus_mode(applications: list[dict[str, Any]]) -> None:
         st.write("No overdue follow-ups right now.")
 
 
-def render_reminders(
-    data: dict[str, list[dict[str, Any]]], applications: list[dict[str, Any]], user_key: str | None
-) -> None:
+def render_reminders(data: dict[str, list[dict[str, Any]]], applications: list[dict[str, Any]]) -> None:
     st.subheader("Reminders")
     app_options = ["General reminder"] + [f"{app['company']} | {app['role']}" for app in applications]
 
@@ -302,7 +233,7 @@ def render_reminders(
                 "due_date": due_date.isoformat(),
                 "channels": reminder_channel,
             }
-            add_reminder(data, reminder, user_key)
+            add_reminder(data, reminder)
             st.success("Reminder added.")
             st.rerun()
 
@@ -477,8 +408,7 @@ def main() -> None:
         "prepare for interviews, and export your tracker for Excel or Google Sheets."
     )
 
-    user_key, _ = render_auth_gate()
-    data = load_data(user_key)
+    data = load_data()
     applications = data["applications"]
     reminders = data["reminders"]
 
@@ -489,13 +419,13 @@ def main() -> None:
     )
 
     with tab1:
-        render_add_application(data, user_key)
+        render_add_application(data)
     with tab2:
         render_tracker(applications)
     with tab3:
         render_focus_mode(applications)
     with tab4:
-        render_reminders(data, applications, user_key)
+        render_reminders(data, applications)
     with tab5:
         render_insights(applications)
     with tab6:
