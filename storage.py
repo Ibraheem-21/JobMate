@@ -1,4 +1,5 @@
 import csv
+import hashlib
 import io
 import json
 import re
@@ -8,19 +9,30 @@ from typing import Any
 
 
 DATA_FILE = Path(__file__).with_name("jobmate_data.json")
+USER_DATA_DIR = Path(__file__).with_name("user_data")
 
 
-def load_data() -> dict[str, list[dict[str, Any]]]:
-    if DATA_FILE.exists():
+def get_data_file(user_key: str | None = None) -> Path:
+    if user_key:
+        USER_DATA_DIR.mkdir(exist_ok=True)
+        safe_name = hashlib.sha256(user_key.encode("utf-8")).hexdigest()[:24]
+        return USER_DATA_DIR / f"{safe_name}.json"
+    return DATA_FILE
+
+
+def load_data(user_key: str | None = None) -> dict[str, list[dict[str, Any]]]:
+    data_file = get_data_file(user_key)
+    if data_file.exists():
         try:
-            return json.loads(DATA_FILE.read_text(encoding="utf-8"))
+            return json.loads(data_file.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             pass
     return {"applications": [], "reminders": []}
 
 
-def save_data(data: dict[str, list[dict[str, Any]]]) -> None:
-    DATA_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
+def save_data(data: dict[str, list[dict[str, Any]]], user_key: str | None = None) -> None:
+    data_file = get_data_file(user_key)
+    data_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
 def normalize_text(value: str) -> str:
@@ -52,18 +64,22 @@ def build_email_draft(application: dict[str, Any]) -> str:
     )
 
 
-def add_application(data: dict[str, list[dict[str, Any]]], application: dict[str, Any]) -> None:
+def add_application(
+    data: dict[str, list[dict[str, Any]]], application: dict[str, Any], user_key: str | None = None
+) -> None:
     application["id"] = int(datetime.now().timestamp() * 1000)
     application["created_at"] = datetime.now().isoformat()
     application["email_draft"] = build_email_draft(application)
     data["applications"].append(application)
-    save_data(data)
+    save_data(data, user_key)
 
 
-def add_reminder(data: dict[str, list[dict[str, Any]]], reminder: dict[str, Any]) -> None:
+def add_reminder(
+    data: dict[str, list[dict[str, Any]]], reminder: dict[str, Any], user_key: str | None = None
+) -> None:
     reminder["id"] = int(datetime.now().timestamp() * 1000)
     data["reminders"].append(reminder)
-    save_data(data)
+    save_data(data, user_key)
 
 
 def applications_to_csv(applications: list[dict[str, Any]]) -> str:

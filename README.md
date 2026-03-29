@@ -2,6 +2,14 @@
 
 JobMate is a Streamlit-based job application tracker for organizing applications, reminders, recruiter outreach, interview preparation, and exportable tracking data in one place.
 
+## Live Demo
+
+Public app:
+
+https://ibraheem-21-jobmate-main-bh0rps.streamlit.app/
+
+Important: the hosted app is now intended to be used with authenticated per-user storage. Local development still works without login, but the public deployment should rely on Streamlit authentication so each signed-in user gets a separate private data file.
+
 ## What It Does
 
 - Log and manage job applications manually
@@ -108,11 +116,41 @@ http://localhost:8501
 
 ## Data Storage
 
-JobMate stores data locally in `jobmate_data.json` in the project folder. This keeps the app simple and easy to run without a database.
+JobMate now supports two storage modes:
+
+- Local development: data is stored in `jobmate_data.json`
+- Hosted authenticated mode: data is stored in a per-user file under `user_data/`, keyed from the signed-in user's identity
+
+This keeps local setup simple while making the hosted app much safer for public sharing.
+
+## Hosted Privacy Model
+
+For the public Streamlit deployment, JobMate is designed to use Streamlit's login system and separate each user's data by authenticated identity.
+
+- Signed-in users get isolated storage
+- Users should not see each other's job tracker data
+- Local development can still run without authentication
+
+If you deploy this yourself, configure Streamlit authentication before treating it as a private app.
+
+## Streamlit Authentication Setup
+
+JobMate is prepared for the Streamlit auth flow using `st.login()`, `st.user`, and `st.logout()`.
+
+For a hosted deployment, configure authentication in Streamlit using an OIDC provider and the app's Streamlit secrets. Once configured:
+
+1. Users sign in through Streamlit.
+2. The app reads the authenticated identity from `st.user`.
+3. JobMate stores each user's tracker data separately.
+
+Official Streamlit auth docs:
+
+https://docs.streamlit.io/develop/tutorials/authentication
 
 ## Notes
 
 - This is currently a local MVP, not a multi-user production app.
+- The hosted app is much safer when Streamlit authentication is configured, but it is still a lightweight MVP rather than a full production platform.
 - Reminders are in-app organizational tools and do not yet send real emails or calendar notifications.
 - The parser module is kept in the project for future expansion such as resume review, cover letter generation, or structured job-post analysis.
 
